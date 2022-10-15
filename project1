@@ -1,0 +1,227 @@
+import numpy as np
+import math
+import matplotlib.pyplot as plt
+
+# Para mostrar apenas 3 casas decimais
+np.set_printoptions(precision=3)
+
+
+# Direções: informar aqui a direção de cada lâmina (em graus), de CIMA para BAIXO em relação ao laminado:
+direc_deg = [0,45,0,45,0,45,45,0,45,0,45,0]
+
+# Conversão para radianos
+direc = np.radians(direc_deg)
+n = len(direc)
+
+#Vetor de carregamentos (elementos não-nulos estão em unidades de N/mm)
+# Informar aqui os esforços, obedecendo a convenção:
+#carreg = [[Nx],[Ny],[Nxy],[Mx],[My],[Mxy]]
+
+carreg = [[1000*1000],[200*1000],[0],[0],[0],[0]] #N/m
+
+#Espessura de cada lâmina (esp): informar 
+esp = 0.29E-3 #m
+
+#Espessura do laminado
+h = n*esp #m
+
+# Dados do material: informar aqui:
+E11 = 77E9 #Pa
+E22 = 75E9 #Pa
+nu12 = 0.06
+G12 = 6.5E9 #Pa
+
+#Relação entre coeficientes de Poisson
+nu21 = (E22*nu12)/E11
+
+# Informações sobre cirtério de falha (todas em MPa)
+XT = 963E6
+XC = -856E6
+YT = 900E6
+YC = -900E6
+S12 = 71E6
+
+
+
+
+Q11 = E11/(1-nu12*nu21)
+Q22 = E22/(1-nu12*nu21)
+Q66 = G12
+Q12 = (nu12*E22)/(1-nu12*nu21)
+Q21 = Q12
+
+Q = np.array([[Q11, Q12, 0],[Q21, Q22, 0], [0, 0, Q66]])
+cos = np.cos(direc)
+sin = np.sin(direc)
+
+# Inicialização dos vetores:
+T = [[0 for _ in range(1)] for _ in range(n)]
+T_inv = [[0 for _ in range(1)] for _ in range(n)]
+Q_dash = [[0 for _ in range(1)] for _ in range(n)]
+Reuter = [[1,0,0],[0,1,0],[0,0,2]] # Matriz de Reuter
+
+# Cálculo da matriz Q_dash para cada uma das lâminas 
+for i in range(n):
+    T[i] = np.array([[cos[i]**2, sin[i]**2, 2*sin[i]*cos[i]],[sin[i]**2, cos[i]**2, -2*sin[i]*cos[i]],[-sin[i]*cos[i], sin[i]*cos[i], cos[i]**2-sin[i]**2]])
+    T_inv[i] = np.linalg.inv(T[i])
+    Q_dash[i] = T_inv[i]@Q@Reuter@T[i]@np.linalg.inv(Reuter)
+#   print(Q_dash[i])
+
+
+
+
+# Matriz A: rigidez à tração e compressão
+# Inicialização
+A_local = [[0 for _ in range(1)] for _ in range(n)]
+A_global = 0
+
+for i in range(n):
+    A_local[i] = Q_dash[i]*(((((n/2)-(i+1))/n)*-h) - (((n/2 - i)/n)*-h))
+    #A_local[i] = Q_dash[i]*(h/n) # retorna os mesmos resultados, significa que está ok
+    A_global = A_global + A_local[i]
+#print(A_global)
+    
+# Matriz B: acoplamento entre rigidez no plano e rigidez à flexão
+B_local = [[0 for _ in range(1)] for _ in range(n)]
+B_global = 0
+for i in range(n):
+    B_local[i] = 0.5*Q_dash[i]*(((((n/2)-(i+1))/n)*-h)**2 - (((n/2 - i)/n)*-h)**2)
+    B_global = B_global + B_local[i]
+#print(B_global)
+
+# Matriz D: rigidez à flexão ou torção
+D_local = [[0 for _ in range(1)] for _ in range(n)]
+D_global = 0
+for i in range(n):
+    D_local[i] = (1/3)*Q_dash[i]*(((((n/2)-(i+1))/n)*-h)**3 - (((n/2 - i)/n)*-h)**3)
+    D_global = D_global + D_local[i]
+#print(D_global)
+
+# Combinando as matrizes em uma só   
+linha1 = np.vstack((A_global,B_global))
+linha2 = np.vstack((B_global,D_global))
+ABBD = np.hstack((linha1,linha2))
+print("Matriz ABBD:")
+print(ABBD)
+
+
+
+# Inicialização do vetor
+def_curv = [[0],[0],[0],[0],[0],[0]]
+
+def_curv = np.linalg.inv(ABBD)@carreg
+
+epsilon_0_global = np.vstack((def_curv[0],def_curv[1],def_curv[2]))
+K_global = np.vstack((def_curv[3],def_curv[4],def_curv[5]))
+
+print(def_curv)
+
+
+
+# Tensões e deformações em cada lâmina (coordenadas z referenciadas no plano médio de cada lâmina)
+sigma_global = [[0 for _ in range(1)] for _ in range(n)]
+sigma_local = [[0 for _ in range(1)] for _ in range(n)]
+z = [[0 for _ in range(1)] for _ in range(n)]
+epsilon_global = [[0 for _ in range(1)] for _ in range(n)]
+epsilon_local = [[0 for _ in range(1)] for _ in range(n)]
+y = [[0 for _ in range(1)] for _ in range(n)]
+
+for i in range(n):
+    z[i] = 0.5*(((((n/2)-(i+1))/n)*-h) + (((n/2 - i)/n)*-h))
+    sigma_global[i] = (Q_dash[i]@(epsilon_0_global + (z[i]*K_global)))
+    print("==============================")
+    print("Resultados lâmina %d:" %(i+1))
+    print("Tensão na lâmina no sistema global de coordenadas (MPa): ")
+    print(sigma_global[i]*10**-6)
+    sigma_local[i] = T[i]@sigma_global[i]
+    print("Tensão na lâmina no sistema local de coordenadas (MPa):")
+    print(sigma_local[i]*10**-6)
+    epsilon_global[i] = epsilon_0_global + z[i]*K_global
+    print("Deformação no plano médio da lâmina no sistema global de coordenadas:")
+    print(epsilon_global[i])
+    epsilon_local[i] = T[i]@epsilon_global[i]
+    print("Deformação no plano médio da lâmina no sistema local de coordenadas:")
+    print(epsilon_local[i])
+
+
+
+CS_1 = [[0 for _ in range(1)] for _ in range(n)]
+CS_2 = [[0 for _ in range(1)] for _ in range(n)]
+CS_12 = [[0 for _ in range(1)] for _ in range(n)]
+
+#sigma_local_transp = np.transpose(sigma_local)
+
+for i in range(n):
+    if sigma_local[i][0,0] > 0:
+        CS_1[i] = XT/sigma_local[i][0,0]
+    else:
+        CS_1[i] = (-XC)/sigma_local[i][0,0]
+
+    if sigma_local[i][1,0] > 0:
+        CS_2[i] = YT/sigma_local[i][1,0] 
+    else:
+        CS_2[i] = (-YC)/sigma_local[i][1,0] 
+
+    if sigma_local[i][2,0] > 0:
+        CS_12[i] = S12/abs(sigma_local[i][2,0])
+    else:
+        CS_12[i] = S12/abs(sigma_local[i][2,0])
+   
+CS = min([min(CS_1),min(CS_2),min(CS_12)])
+
+# resultados:
+print("Margem de segurança pelo critério da máxima tensão: %.3f " %CS)
+
+
+
+FS_TH = [[0 for _ in range(1)] for _ in range(n)]
+MS_TH = [[0 for _ in range(1)] for _ in range(n)]
+
+for i in range(n):
+    if sigma_local[i][0,0] > 0 and sigma_local[i][1,0] > 0:
+        FS_TH[i] = np.sqrt((sigma_local[i][0,0]/XT)**2 + (sigma_local[i][1,0]/YT)**2 - (sigma_local[i][1,0]*sigma_local[i][0,0]/(XT**2)+(sigma_local[i][2,0]/S12)**2))
+        MS_TH[i] = 1/FS_TH[i]
+    elif sigma_local[i][0,0] < 0 and sigma_local[i][1,0] > 0:
+        FS_TH[i] = np.sqrt((sigma_local[i][0,0]/XC)**2 + (sigma_local[i][1,0]/YT)**2 - (sigma_local[i][1,0]*sigma_local[i][0,0]/(XC**2)+(sigma_local[i][2,0]/S12)**2))
+        MS_TH[i] = 1/FS_TH[i] 
+    elif sigma_local[i][0,0] < 0 and sigma_local[i][1,0] < 0:
+        FS_TH[i] = np.sqrt((sigma_local[i][0,0]/XC)**2 + (sigma_local[i][1,0]/YC)**2 - (sigma_local[i][1,0]*sigma_local[i][0,0]/(XC**2)+(sigma_local[i][2,0]/S12)**2))
+        MS_TH[i] = 1/FS_TH[i]
+    elif sigma_local[i][0,0] > 0 and sigma_local[i][1,0] < 0:
+        FS_TH[i] = np.sqrt((sigma_local[i][0,0]/XT)**2 + (sigma_local[i][1,0]/YC)**2 - (sigma_local[i][1,0]*sigma_local[i][0,0]/(XT**2)+(sigma_local[i][2,0]/S12)**2))
+        MS_TH[i] = 1/FS_TH[i]   
+
+print("Margem de segurança pelo critério de Tsai-Hill: %.3f " %(min(MS_TH)))
+
+
+
+
+
+import math
+F1 = 1/XT + 1/XC
+F2 = 1/YT + 1/YC
+F11 = -1/(XT*XC)
+F22 = -1/(YT*YC)
+F66 = (1/S12)**2
+F12 = -0.5*np.sqrt(F11*F22)
+
+A = [[0 for _ in range(1)] for _ in range(n)]
+B = [[0 for _ in range(1)] for _ in range(n)]
+Sf_pos = [[0 for _ in range(1)] for _ in range(n)]
+Sf_neg = [[0 for _ in range(1)] for _ in range(n)]
+Sf = [[0 for _ in range(1)] for _ in range(n)]
+
+for i in range(n):
+    A[i] = F11*sigma_local[i][0,0]**2 + F22*sigma_local[i][1,0]**2 + F66*sigma_local[i][2,0]**2 + 2*F12*sigma_local[i][0,0]*sigma_local[i][1,0]
+    B[i] = F1*sigma_local[i][0,0] + F2*sigma_local[i][1,0]
+    Sf_pos[i] = (-B[i] + np.sqrt(B[i]**2 + 4*A[i]))/(2*A[i])
+    Sf_neg[i] = abs((-B[i] - np.sqrt(B[i]**2 + 4*A[i]))/(2*A[i]))
+
+    Sf[i] = min(Sf_pos[i],Sf_neg[i])
+
+print(Sf)
+
+
+
+
+
