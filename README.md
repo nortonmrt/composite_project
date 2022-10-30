@@ -5,10 +5,10 @@ This project aims to give a basic project analysis for composite structures, usi
 - The stresses and strains in global and local coordinates of each lamina;
 - Analysis fo the structure integrity in 3 failure theories: maximum stress, Tsai-Hill and Tsai-Wu;
 - Failure graph (as shown in the figure);
-![image](https://user-images.githubusercontent.com/108631583/198892820-8a06669e-c6a1-48c7-9752-0265b828d792.png)
+![image](https://user-images.githubusercontent.com/108631583/198893050-f5786829-e904-45e5-a901-f012f42a3e49.png)
 - Graphical distribution of stresses and strains along the thickness (also shown in the following figures).
-![image](https://user-images.githubusercontent.com/108631583/198892856-b2fa76e6-ebfd-4669-9c12-ab34dfb19d7a.png)
-![image](https://user-images.githubusercontent.com/108631583/198892860-f3f5239e-11db-47aa-9649-62991b946587.png)
+![image](https://user-images.githubusercontent.com/108631583/198893199-ced11214-fb50-441c-8c04-9b7ec727e723.png)
+![image](https://user-images.githubusercontent.com/108631583/198893164-2980eb84-0d24-4b26-8ea8-f1f24a17834b.png)
 
 In this first version the laminated properties must be acquired experimentally, but for next versions it will be possible to use theoretical methods such as the Mixture Rule. The user should input the properties, but is possible also to use a ready example implemented on the code. Just uncomment these data and comment the input functions.
 
