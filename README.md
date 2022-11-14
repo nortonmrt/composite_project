@@ -13,7 +13,7 @@ Failure graph:
 
 ![image](https://user-images.githubusercontent.com/108631583/198893378-956a3c4e-3bf9-42a3-9d35-a1d9c963a202.png)
 
-In this graph, it is important to notice that, if any of the red dots are out of at least one of the curves, the laminated fails. In this case, it is necessary to change geometrical properties or reduce the load applied to the structure.
+In this graph, it is important to notice that, if any of the red dots are out of at least one of the curves, the laminate fails. In this case, it is necessary to change geometrical properties or reduce the load applied to the structure.
 
 Graphical distribution of stress and strain along the thickness of the laminate:
 
